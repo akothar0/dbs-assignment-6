@@ -62,6 +62,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["user_profiles"]["Insert"]>;
+        Relationships: [];
       };
       contacts: {
         Row: {
@@ -99,6 +100,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["contacts"]["Insert"]>;
+        Relationships: [];
       };
       interactions: {
         Row: {
@@ -124,6 +126,15 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["interactions"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "interactions_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       tasks: {
         Row: {
@@ -153,6 +164,15 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["tasks"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "tasks_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       message_drafts: {
         Row: {
@@ -180,6 +200,15 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["message_drafts"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "message_drafts_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       ai_suggestions: {
         Row: {
@@ -211,7 +240,34 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["ai_suggestions"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "ai_suggestions_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_suggestions_draft_id_fkey";
+            columns: ["draft_id"];
+            isOneToOne: false;
+            referencedRelation: "message_drafts";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: {
+      pipeline_stage: PipelineStage;
+      interaction_type: InteractionType;
+      task_status: TaskStatus;
+      task_source: TaskSource;
+      draft_goal: DraftGoal;
+      ai_suggestion_status: AiSuggestionStatus;
+    };
+    CompositeTypes: Record<string, never>;
   };
 };
