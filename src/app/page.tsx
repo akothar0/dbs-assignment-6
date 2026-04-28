@@ -1,4 +1,10 @@
 import Link from "next/link";
+import {
+  Show,
+  SignInButton,
+  SignUpButton,
+  UserButton,
+} from "@clerk/nextjs";
 
 const previewContacts = [
   {
@@ -30,15 +36,24 @@ export default function Home() {
             Rolo
           </Link>
           <div className="flex items-center gap-3 text-sm font-medium">
-            <Link href="/app/today" className="hidden text-[#5f594f] sm:block">
-              Open workspace
-            </Link>
-            <Link
-              href="/app/today"
-              className="rounded-md bg-[#1f6f68] px-4 py-2 text-white transition hover:bg-[#195b55]"
-            >
-              Start
-            </Link>
+            <Show when="signed-out">
+              <SignInButton mode="modal">
+                <button className="hidden text-[#5f594f] sm:block">
+                  Sign in
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <button className="rounded-md bg-[#1f6f68] px-4 py-2 text-white transition hover:bg-[#195b55]">
+                  Start
+                </button>
+              </SignUpButton>
+            </Show>
+            <Show when="signed-in">
+              <Link href="/app/today" className="hidden text-[#5f594f] sm:block">
+                Open workspace
+              </Link>
+              <UserButton />
+            </Show>
           </div>
         </nav>
 
@@ -55,12 +70,21 @@ export default function Home() {
               into one focused daily workflow for MBA recruiting.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/app/today"
-                className="rounded-md bg-[#1f6f68] px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-[#195b55]"
-              >
-                Open today&apos;s queue
-              </Link>
+              <Show when="signed-out">
+                <SignUpButton mode="modal">
+                  <button className="rounded-md bg-[#1f6f68] px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-[#195b55]">
+                    Create account
+                  </button>
+                </SignUpButton>
+              </Show>
+              <Show when="signed-in">
+                <Link
+                  href="/app/today"
+                  className="rounded-md bg-[#1f6f68] px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-[#195b55]"
+                >
+                  Open today&apos;s queue
+                </Link>
+              </Show>
               <Link
                 href="/app/contacts"
                 className="rounded-md border border-[#c9c0b2] px-5 py-3 text-center text-sm font-semibold text-[#29251f] transition hover:border-[#8f8574]"
