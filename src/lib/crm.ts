@@ -1,4 +1,8 @@
-import type { InteractionType, PipelineStage } from "@/lib/database.types";
+import type {
+  DraftGoal,
+  InteractionType,
+  PipelineStage,
+} from "@/lib/database.types";
 
 export const pipelineStages: Array<{ value: PipelineStage; label: string }> = [
   { value: "cold", label: "Cold" },
@@ -44,4 +48,16 @@ export function addDays(value: string | Date, days: number) {
   const date = new Date(value);
   date.setDate(date.getDate() + days);
   return date.toISOString();
+}
+
+export const draftGoals: Array<{ value: DraftGoal; label: string }> = [
+  { value: "cold_intro", label: "Cold intro" },
+  { value: "follow_up", label: "Follow-up" },
+  { value: "thank_you", label: "Thank-you" },
+  { value: "referral_ask", label: "Referral ask" },
+  { value: "reconnect", label: "Reconnect" },
+];
+
+export function formatDraftGoal(goal: DraftGoal) {
+  return draftGoals.find((item) => item.value === goal)?.label ?? goal;
 }

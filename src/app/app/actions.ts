@@ -2,8 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { InteractionType, PipelineStage } from "@/lib/database.types";
-import { addDays, interactionTypes, pipelineStages } from "@/lib/crm";
+import { createAnthropicClient, getAnthropicModel } from "@/lib/anthropic";
+import type {
+  DraftGoal,
+  InteractionType,
+  PipelineStage,
+} from "@/lib/database.types";
+import {
+  addDays,
+  draftGoals,
+  formatDraftGoal,
+  interactionTypes,
+  pipelineStages,
+} from "@/lib/crm";
 import {
   createSupabaseServerClient,
   getCurrentUserId,
@@ -39,6 +50,36 @@ function parseInteractionType(value: FormDataEntryValue | null): InteractionType
   }
 
   return "note";
+}
+
+function parseDraftGoal(value: FormDataEntryValue | null): DraftGoal {
+  const goal = value?.toString() as DraftGoal | undefined;
+  if (goal && draftGoals.some((item) => item.value === goal)) {
+    return goal;
+  }
+
+  return "follow_up";
+}
+
+function parseJsonObject(value: string) {
+  const match = value.match(/\{[\s\S]*\}/);
+  if (!match) {
+    throw new Error("Claude did not return JSON.");
+  }
+
+  return JSON.parse(match[0]) as {
+    subject?: string | null;
+    body?: string;
+    confidence?: number;
+    personalizationSignals?: string[];
+    suggestedTask?: {
+      title?: string;
+      description?: string | null;
+      due_at?: string | null;
+    } | null;
+    suggestedStage?: PipelineStage | null;
+    reasoning?: string | null;
+  };
 }
 
 export async function saveProfile(formData: FormData) {
@@ -299,6 +340,236 @@ export async function dismissTask(formData: FormData) {
   }
 
   revalidatePath("/app/today");
+  if (contactId) {
+    revalidatePath(`/app/contacts/${contactId}`);
+  }
+}
+
+export async function generateDraft(formData: FormData) {
+  const userId = await getCurrentUserId();
+  const supabase = await createSupabaseServerClient();
+  const anthropic = createAnthropicClient();
+  const contactId = optionalString(formData.get("contact_id"));
+  const goal = parseDraftGoal(formData.get("goal"));
+  const instructions = optionalString(formData.get("instructions"));
+
+  if (!contactId) {
+    throw new Error("Contact id is required.");
+  }
+
+  const [{ data: profile }, { data: contact }, { data: interactions }] =
+    await Promise.all([
+      supabase.from("user_profiles").select("*").maybeSingle(),
+      supabase.from("contacts").select("*").eq("id", contactId).single(),
+      supabase
+        .from("interactions")
+        .select("type, occurred_at, summary, raw_notes")
+        .eq("contact_id", contactId)
+        .order("occurred_at", { ascending: false })
+        .limit(8),
+    ]);
+
+  if (!contact) {
+    throw new Error("Contact not found.");
+  }
+
+  const prompt = {
+    goal: formatDraftGoal(goal),
+    userProfile: profile,
+    contact,
+    recentInteractions: interactions ?? [],
+    instructions,
+    outputContract: {
+      subject: "optional email subject",
+      body: "editable outreach draft",
+      confidence: "number between 0 and 1",
+      personalizationSignals: ["specific facts used"],
+      suggestedTask: {
+        title: "optional next task title",
+        description: "optional task description",
+        due_at: "optional ISO timestamp or null",
+      },
+      suggestedStage: "optional pipeline stage enum or null",
+      reasoning: "brief rationale for the suggestion",
+    },
+    validStages: pipelineStages.map((stage) => stage.value),
+  };
+
+  const message = await anthropic.messages.create({
+    model: getAnthropicModel(),
+    max_tokens: 1400,
+    system:
+      "You write warm, specific MBA recruiting outreach. Avoid generic praise, exaggeration, and sales language. Return only valid JSON matching the requested contract.",
+    messages: [
+      {
+        role: "user",
+        content: JSON.stringify(prompt, null, 2),
+      },
+    ],
+  });
+
+  const text = message.content
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("\n");
+  const parsed = parseJsonObject(text);
+
+  if (!parsed.body) {
+    throw new Error("Claude returned an empty draft.");
+  }
+
+  const suggestedStage = pipelineStages.some(
+    (stage) => stage.value === parsed.suggestedStage,
+  )
+    ? parsed.suggestedStage
+    : null;
+
+  const { data: draft, error: draftError } = await supabase
+    .from("message_drafts")
+    .insert({
+      user_id: userId,
+      contact_id: contactId,
+      goal,
+      subject: parsed.subject ?? null,
+      body: parsed.body,
+      confidence: parsed.confidence ?? null,
+      personalization_signals: parsed.personalizationSignals ?? [],
+    })
+    .select("id")
+    .single();
+
+  if (draftError) {
+    throw new Error(draftError.message);
+  }
+
+  if (parsed.suggestedTask || suggestedStage || parsed.reasoning) {
+    const { error: suggestionError } = await supabase
+      .from("ai_suggestions")
+      .insert({
+        user_id: userId,
+        contact_id: contactId,
+        draft_id: draft.id,
+        suggested_task: parsed.suggestedTask ?? null,
+        suggested_stage: suggestedStage,
+        reasoning: parsed.reasoning ?? null,
+      });
+
+    if (suggestionError) {
+      throw new Error(suggestionError.message);
+    }
+  }
+
+  revalidatePath(`/app/contacts/${contactId}`);
+}
+
+function suggestedTaskToInsert(
+  task: unknown,
+  userId: string,
+  contactId: string | null,
+) {
+  if (!task || typeof task !== "object") {
+    return null;
+  }
+
+  const record = task as {
+    title?: unknown;
+    description?: unknown;
+    due_at?: unknown;
+  };
+
+  if (typeof record.title !== "string" || !record.title.trim()) {
+    return null;
+  }
+
+  return {
+    user_id: userId,
+    contact_id: contactId,
+    title: record.title.trim(),
+    description:
+      typeof record.description === "string" ? record.description : null,
+    due_at: typeof record.due_at === "string" ? record.due_at : null,
+    source: "ai" as const,
+  };
+}
+
+export async function acceptAiSuggestion(formData: FormData) {
+  const userId = await getCurrentUserId();
+  const supabase = await createSupabaseServerClient();
+  const suggestionId = optionalString(formData.get("suggestion_id"));
+  const contactId = optionalString(formData.get("contact_id"));
+
+  if (!suggestionId) {
+    throw new Error("Suggestion id is required.");
+  }
+
+  const { data: suggestion, error } = await supabase
+    .from("ai_suggestions")
+    .select("*")
+    .eq("id", suggestionId)
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const taskInsert = suggestedTaskToInsert(
+    suggestion.suggested_task,
+    userId,
+    suggestion.contact_id,
+  );
+
+  if (taskInsert) {
+    const { error: taskError } = await supabase.from("tasks").insert(taskInsert);
+    if (taskError) {
+      throw new Error(taskError.message);
+    }
+  }
+
+  if (suggestion.suggested_stage && suggestion.contact_id) {
+    const { error: contactError } = await supabase
+      .from("contacts")
+      .update({ stage: suggestion.suggested_stage })
+      .eq("id", suggestion.contact_id);
+
+    if (contactError) {
+      throw new Error(contactError.message);
+    }
+  }
+
+  const { error: updateError } = await supabase
+    .from("ai_suggestions")
+    .update({ status: "accepted", accepted_at: new Date().toISOString() })
+    .eq("id", suggestionId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidatePath("/app/today");
+  revalidatePath("/app/pipeline");
+  if (contactId) {
+    revalidatePath(`/app/contacts/${contactId}`);
+  }
+}
+
+export async function dismissAiSuggestion(formData: FormData) {
+  const supabase = await createSupabaseServerClient();
+  const suggestionId = optionalString(formData.get("suggestion_id"));
+  const contactId = optionalString(formData.get("contact_id"));
+
+  if (!suggestionId) {
+    throw new Error("Suggestion id is required.");
+  }
+
+  const { error } = await supabase
+    .from("ai_suggestions")
+    .update({ status: "dismissed", dismissed_at: new Date().toISOString() })
+    .eq("id", suggestionId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
   if (contactId) {
     revalidatePath(`/app/contacts/${contactId}`);
   }

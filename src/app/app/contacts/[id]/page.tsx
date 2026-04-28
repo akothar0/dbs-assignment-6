@@ -1,13 +1,18 @@
 import { notFound } from "next/navigation";
 import {
+  acceptAiSuggestion,
   completeTask,
   createTask,
+  dismissAiSuggestion,
   dismissTask,
+  generateDraft,
   logInteraction,
   updateContactStage,
 } from "@/app/app/actions";
 import {
+  draftGoals,
   formatDate,
+  formatDraftGoal,
   formatInteractionType,
   formatStage,
   interactionTypes,
@@ -39,6 +44,18 @@ export default async function ContactDetailPage({
     .select("*")
     .eq("contact_id", id)
     .order("due_at", { ascending: true, nullsFirst: false });
+  const { data: draftsData } = await supabase
+    .from("message_drafts")
+    .select("*")
+    .eq("contact_id", id)
+    .order("created_at", { ascending: false })
+    .limit(5);
+  const { data: suggestionsData } = await supabase
+    .from("ai_suggestions")
+    .select("*")
+    .eq("contact_id", id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
 
   if (!contact) {
     notFound();
@@ -46,6 +63,8 @@ export default async function ContactDetailPage({
 
   const interactions = interactionsData ?? [];
   const tasks = tasksData ?? [];
+  const drafts = draftsData ?? [];
+  const suggestions = suggestionsData ?? [];
   const openTasks = tasks.filter((task) => task.status === "open");
 
   return (
@@ -117,6 +136,119 @@ export default async function ContactDetailPage({
               {contact.notes}
             </p>
           ) : null}
+        </div>
+
+        <div className="rounded-lg border border-[#d7d0c3] bg-[#fffbf4] p-5">
+          <h2 className="font-semibold">AI outreach draft</h2>
+          <form action={generateDraft} className="mt-4 space-y-4">
+            <input type="hidden" name="contact_id" value={contact.id} />
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="text-sm font-semibold">Goal</span>
+                <select
+                  name="goal"
+                  className="mt-2 w-full rounded-md border border-[#c9c0b2] bg-white px-3 py-2 text-sm outline-none focus:border-[#1f6f68]"
+                >
+                  {draftGoals.map((goal) => (
+                    <option key={goal.value} value={goal.value}>
+                      {goal.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold">Extra direction</span>
+                <input
+                  name="instructions"
+                  placeholder="Tone, ask, context to include"
+                  className="mt-2 w-full rounded-md border border-[#c9c0b2] bg-white px-3 py-2 text-sm outline-none focus:border-[#1f6f68]"
+                />
+              </label>
+            </div>
+            <button className="rounded-md bg-[#1f6f68] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#195b55]">
+              Generate draft
+            </button>
+          </form>
+
+          {suggestions.length > 0 ? (
+            <div className="mt-5 space-y-3 border-t border-[#e3dacc] pt-4">
+              <h3 className="text-sm font-semibold">Pending AI suggestions</h3>
+              {suggestions.map((suggestion) => (
+                <div
+                  key={suggestion.id}
+                  className="rounded-md border border-[#e3dacc] bg-white p-3"
+                >
+                  <p className="text-sm leading-6 text-[#4b463d]">
+                    {suggestion.reasoning ?? "Review suggested next steps."}
+                  </p>
+                  {suggestion.suggested_stage ? (
+                    <p className="mt-2 text-sm text-[#6d665c]">
+                      Stage: {formatStage(suggestion.suggested_stage)}
+                    </p>
+                  ) : null}
+                  <div className="mt-3 flex gap-2">
+                    <form action={acceptAiSuggestion}>
+                      <input
+                        type="hidden"
+                        name="suggestion_id"
+                        value={suggestion.id}
+                      />
+                      <input
+                        type="hidden"
+                        name="contact_id"
+                        value={contact.id}
+                      />
+                      <button className="rounded-md bg-[#1f6f68] px-3 py-2 text-sm font-semibold text-white">
+                        Accept
+                      </button>
+                    </form>
+                    <form action={dismissAiSuggestion}>
+                      <input
+                        type="hidden"
+                        name="suggestion_id"
+                        value={suggestion.id}
+                      />
+                      <input
+                        type="hidden"
+                        name="contact_id"
+                        value={contact.id}
+                      />
+                      <button className="rounded-md border border-[#c9c0b2] px-3 py-2 text-sm font-semibold">
+                        Dismiss
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="mt-5 divide-y divide-[#e3dacc] border-t border-[#e3dacc] pt-4">
+            {drafts.length === 0 ? (
+              <p className="py-3 text-sm text-[#6d665c]">
+                No drafts generated yet.
+              </p>
+            ) : (
+              drafts.map((draft) => (
+                <article key={draft.id} className="py-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold">{formatDraftGoal(draft.goal)}</p>
+                    <p className="text-sm text-[#6d665c]">
+                      {formatDate(draft.created_at)}
+                    </p>
+                  </div>
+                  {draft.subject ? (
+                    <p className="mt-2 text-sm font-semibold">
+                      {draft.subject}
+                    </p>
+                  ) : null}
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#4b463d]">
+                    {draft.body}
+                  </p>
+                </article>
+              ))
+            )}
+          </div>
         </div>
 
         <div className="rounded-lg border border-[#d7d0c3] bg-[#fffbf4] p-5">
