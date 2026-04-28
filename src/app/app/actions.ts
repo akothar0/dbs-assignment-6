@@ -270,6 +270,7 @@ export async function createTask(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const contactId = optionalString(formData.get("contact_id"));
   const title = optionalString(formData.get("title"));
+  const dueAt = optionalString(formData.get("due_at"));
 
   if (!title) {
     throw new Error("Task title is required.");
@@ -280,7 +281,7 @@ export async function createTask(formData: FormData) {
     contact_id: contactId,
     title,
     description: optionalString(formData.get("description")),
-    due_at: optionalString(formData.get("due_at")),
+    due_at: dueAt ? new Date(dueAt).toISOString() : null,
     source: "manual",
   });
 
