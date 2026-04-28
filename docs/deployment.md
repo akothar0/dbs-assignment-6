@@ -6,8 +6,8 @@ generation by OpenAI.
 
 ## Before Deploying
 
-1. Apply `supabase/migrations/0001_initial_schema.sql` in the Supabase SQL
-   editor.
+1. Apply the SQL files in `supabase/migrations/` in filename order in the
+   Supabase SQL editor.
 2. Confirm the Supabase project is linked to Clerk as a third-party auth
    provider.
 3. Confirm local `.env.local` has the same keys you plan to add to Vercel.
@@ -55,5 +55,5 @@ admin jobs that need it. The current app does not require it.
 2. Import `akothar0/dbs-assignment-6` into Vercel.
 3. Add the environment variables above.
 4. Deploy from `main`.
-5. Sign up or sign in, complete onboarding, add a contact, log an interaction,
-   and generate an AI draft.
+5. Sign up or sign in, complete onboarding, add a contact, add an application,
+   create a prep item, log an interaction, and generate an AI draft.

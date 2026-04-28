@@ -4,20 +4,26 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   createOpenAIClient,
+  contextCaptureFormat,
   draftResponseFormat,
   getOpenAIModel,
+  prepBriefFormat,
 } from "@/lib/openai";
 import type {
+  ApplicationStatus,
   DraftGoal,
   InteractionType,
   PipelineStage,
+  PrepItemType,
 } from "@/lib/database.types";
 import {
   addDays,
+  applicationStatuses,
   draftGoals,
   formatDraftGoal,
   interactionTypes,
   pipelineStages,
+  prepItemTypes,
 } from "@/lib/crm";
 import {
   createSupabaseServerClient,
@@ -63,6 +69,31 @@ function parseDraftGoal(value: FormDataEntryValue | null): DraftGoal {
   }
 
   return "follow_up";
+}
+
+function parseApplicationStatus(
+  value: FormDataEntryValue | null,
+): ApplicationStatus {
+  const status = value?.toString() as ApplicationStatus | undefined;
+  if (status && applicationStatuses.some((item) => item.value === status)) {
+    return status;
+  }
+
+  return "target";
+}
+
+function parsePrepItemType(value: FormDataEntryValue | null): PrepItemType {
+  const type = value?.toString() as PrepItemType | undefined;
+  if (type && prepItemTypes.some((item) => item.value === type)) {
+    return type;
+  }
+
+  return "company_research";
+}
+
+function nullableId(value: FormDataEntryValue | null) {
+  const text = optionalString(value);
+  return text && text !== "none" ? text : null;
 }
 
 export async function saveProfile(formData: FormData) {
@@ -148,6 +179,395 @@ export async function updateContactStage(formData: FormData) {
   revalidatePath("/app/contacts");
   revalidatePath(`/app/contacts/${contactId}`);
   revalidatePath("/app/pipeline");
+}
+
+export async function createApplication(formData: FormData) {
+  const userId = await getCurrentUserId();
+  const supabase = await createSupabaseServerClient();
+  const company = optionalString(formData.get("company"));
+  const role = optionalString(formData.get("role"));
+  const contactId = nullableId(formData.get("contact_id"));
+  const deadline = optionalString(formData.get("deadline"));
+  const nextStep = optionalString(formData.get("next_step"));
+
+  if (!company || !role) {
+    throw new Error("Company and role are required.");
+  }
+
+  const { data, error } = await supabase
+    .from("applications")
+    .insert({
+      user_id: userId,
+      contact_id: contactId,
+      company,
+      role,
+      source: optionalString(formData.get("source")),
+      status: parseApplicationStatus(formData.get("status")),
+      deadline,
+      next_step: nextStep,
+      notes: optionalString(formData.get("notes")),
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (deadline) {
+    const { error: taskError } = await supabase.from("tasks").insert({
+      user_id: userId,
+      contact_id: contactId,
+      title: nextStep ?? `Application deadline: ${role} at ${company}`,
+      description: `Application deadline for ${role} at ${company}.`,
+      due_at: new Date(deadline).toISOString(),
+      source: "rule",
+    });
+
+    if (taskError) {
+      throw new Error(taskError.message);
+    }
+  }
+
+  revalidatePath("/app/today");
+  revalidatePath("/app/applications");
+  redirect(`/app/applications#application-${data.id}`);
+}
+
+export async function updateApplicationStatus(formData: FormData) {
+  const supabase = await createSupabaseServerClient();
+  const applicationId = optionalString(formData.get("application_id"));
+
+  if (!applicationId) {
+    throw new Error("Application id is required.");
+  }
+
+  const { error } = await supabase
+    .from("applications")
+    .update({ status: parseApplicationStatus(formData.get("status")) })
+    .eq("id", applicationId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/app/applications");
+  revalidatePath("/app/today");
+}
+
+export async function createPrepItem(formData: FormData) {
+  const userId = await getCurrentUserId();
+  const supabase = await createSupabaseServerClient();
+  const title = optionalString(formData.get("title"));
+  const dueAt = optionalString(formData.get("due_at"));
+  const contactId = nullableId(formData.get("contact_id"));
+  const applicationId = nullableId(formData.get("application_id"));
+
+  if (!title) {
+    throw new Error("Prep title is required.");
+  }
+
+  const { error } = await supabase.from("prep_items").insert({
+    user_id: userId,
+    contact_id: contactId,
+    application_id: applicationId,
+    type: parsePrepItemType(formData.get("type")),
+    title,
+    body: optionalString(formData.get("body")),
+    due_at: dueAt ? new Date(dueAt).toISOString() : null,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (dueAt) {
+    const { error: taskError } = await supabase.from("tasks").insert({
+      user_id: userId,
+      contact_id: contactId,
+      title,
+      description: "Prep item with a due date.",
+      due_at: new Date(dueAt).toISOString(),
+      source: "manual",
+    });
+
+    if (taskError) {
+      throw new Error(taskError.message);
+    }
+  }
+
+  revalidatePath("/app/today");
+  revalidatePath("/app/prep");
+}
+
+export async function completePrepItem(formData: FormData) {
+  const supabase = await createSupabaseServerClient();
+  const prepItemId = optionalString(formData.get("prep_item_id"));
+
+  if (!prepItemId) {
+    throw new Error("Prep item id is required.");
+  }
+
+  const { error } = await supabase
+    .from("prep_items")
+    .update({ completed_at: new Date().toISOString() })
+    .eq("id", prepItemId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/app/prep");
+}
+
+export async function generatePrepBrief(formData: FormData) {
+  const userId = await getCurrentUserId();
+  const supabase = await createSupabaseServerClient();
+  const openai = createOpenAIClient();
+  const contactId = nullableId(formData.get("contact_id"));
+  const applicationId = nullableId(formData.get("application_id"));
+  const focus = optionalString(formData.get("focus"));
+
+  const [
+    { data: profile },
+    { data: contact },
+    { data: application },
+    { data: recentInteractions },
+    { data: prepItems },
+  ] = await Promise.all([
+    supabase.from("user_profiles").select("*").maybeSingle(),
+    contactId
+      ? supabase.from("contacts").select("*").eq("id", contactId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    applicationId
+      ? supabase
+          .from("applications")
+          .select("*")
+          .eq("id", applicationId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    contactId
+      ? supabase
+          .from("interactions")
+          .select("type, occurred_at, summary, raw_notes")
+          .eq("contact_id", contactId)
+          .order("occurred_at", { ascending: false })
+          .limit(8)
+      : Promise.resolve({ data: [] }),
+    supabase
+      .from("prep_items")
+      .select("type, title, body, due_at")
+      .order("updated_at", { ascending: false })
+      .limit(12),
+  ]);
+
+  const response = await openai.responses.parse({
+    model: getOpenAIModel(),
+    max_output_tokens: 1600,
+    instructions:
+      "You create practical MBA recruiting prep briefs. Be specific, concise, and action-oriented. Ground the brief in the supplied profile, contact, application, interactions, and prep notes.",
+    input: [
+      {
+        role: "user",
+        content: JSON.stringify(
+          {
+            focus,
+            userProfile: profile,
+            contact,
+            application,
+            recentInteractions: recentInteractions ?? [],
+            existingPrep: prepItems ?? [],
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+    text: {
+      format: prepBriefFormat(),
+    },
+  });
+  const parsed = response.output_parsed;
+
+  if (!parsed?.brief) {
+    throw new Error("OpenAI returned an empty prep brief.");
+  }
+
+  const body = [
+    parsed.brief,
+    parsed.talkingPoints.length
+      ? `\nTalking points\n${parsed.talkingPoints.map((item) => `- ${item}`).join("\n")}`
+      : "",
+    parsed.questionsToAsk.length
+      ? `\nQuestions to ask\n${parsed.questionsToAsk.map((item) => `- ${item}`).join("\n")}`
+      : "",
+    parsed.risksOrGaps.length
+      ? `\nRisks or gaps\n${parsed.risksOrGaps.map((item) => `- ${item}`).join("\n")}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const { error } = await supabase.from("prep_items").insert({
+    user_id: userId,
+    contact_id: contactId,
+    application_id: applicationId,
+    type: "prep_brief",
+    title: parsed.title,
+    body,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const taskInserts = parsed.nextSteps
+    .filter((task) => task.title.trim())
+    .map((task) => ({
+      user_id: userId,
+      contact_id: contactId,
+      title: task.title.trim(),
+      description: "Suggested from an AI prep brief.",
+      due_at: task.due_at ? new Date(task.due_at).toISOString() : null,
+      source: "ai" as const,
+    }));
+
+  if (taskInserts.length > 0) {
+    const { error: taskError } = await supabase
+      .from("tasks")
+      .insert(taskInserts);
+
+    if (taskError) {
+      throw new Error(taskError.message);
+    }
+  }
+
+  revalidatePath("/app/today");
+  revalidatePath("/app/prep");
+}
+
+export async function captureContext(formData: FormData) {
+  const userId = await getCurrentUserId();
+  const supabase = await createSupabaseServerClient();
+  const openai = createOpenAIClient();
+  const rawContext = optionalString(formData.get("raw_context"));
+  const contactIdFromForm = nullableId(formData.get("contact_id"));
+  const applicationId = nullableId(formData.get("application_id"));
+
+  if (!rawContext) {
+    throw new Error("Context is required.");
+  }
+
+  const response = await openai.responses.parse({
+    model: getOpenAIModel(),
+    max_output_tokens: 1400,
+    instructions:
+      "Extract practical CRM updates from pasted recruiting context. Prefer conservative extraction over invention. Return only facts supported by the pasted text.",
+    input: [
+      {
+        role: "user",
+        content: JSON.stringify(
+          {
+            rawContext,
+            selectedContactId: contactIdFromForm,
+            selectedApplicationId: applicationId,
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+    text: {
+      format: contextCaptureFormat(),
+    },
+  });
+  const parsed = response.output_parsed;
+
+  if (!parsed) {
+    throw new Error("OpenAI returned no extracted context.");
+  }
+
+  let contactId = contactIdFromForm;
+
+  if (!contactId && parsed.contact?.name) {
+    const { data: contact, error: contactError } = await supabase
+      .from("contacts")
+      .insert({
+        user_id: userId,
+        name: parsed.contact.name,
+        company: parsed.contact.company,
+        role: parsed.contact.role,
+        email: parsed.contact.email,
+        linkedin_url: parsed.contact.linkedinUrl,
+        relationship: parsed.contact.relationship,
+        notes: parsed.notes,
+      })
+      .select("id")
+      .single();
+
+    if (contactError) {
+      throw new Error(contactError.message);
+    }
+
+    contactId = contact.id;
+  }
+
+  if (parsed.interaction && contactId) {
+    const { error } = await supabase.from("interactions").insert({
+      user_id: userId,
+      contact_id: contactId,
+      type: parsed.interaction.type,
+      occurred_at: parsed.interaction.occurred_at
+        ? new Date(parsed.interaction.occurred_at).toISOString()
+        : new Date().toISOString(),
+      summary: parsed.interaction.summary,
+      raw_notes: parsed.interaction.raw_notes ?? rawContext,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  if (parsed.prepItem) {
+    const { error } = await supabase.from("prep_items").insert({
+      user_id: userId,
+      contact_id: contactId,
+      application_id: applicationId,
+      type: parsed.prepItem.type,
+      title: parsed.prepItem.title,
+      body: parsed.prepItem.body ?? rawContext,
+      due_at: parsed.prepItem.due_at
+        ? new Date(parsed.prepItem.due_at).toISOString()
+        : null,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  const taskInserts = parsed.tasks
+    .filter((task) => task.title.trim())
+    .map((task) => ({
+      user_id: userId,
+      contact_id: contactId,
+      title: task.title.trim(),
+      description: task.description,
+      due_at: task.due_at ? new Date(task.due_at).toISOString() : null,
+      source: "ai" as const,
+    }));
+
+  if (taskInserts.length > 0) {
+    const { error } = await supabase.from("tasks").insert(taskInserts);
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  revalidatePath("/app/today");
+  revalidatePath("/app/contacts");
+  revalidatePath("/app/prep");
 }
 
 export async function logInteraction(formData: FormData) {
@@ -341,17 +761,34 @@ export async function generateDraft(formData: FormData) {
     throw new Error("Contact id is required.");
   }
 
-  const [{ data: profile }, { data: contact }, { data: interactions }] =
-    await Promise.all([
-      supabase.from("user_profiles").select("*").maybeSingle(),
-      supabase.from("contacts").select("*").eq("id", contactId).single(),
-      supabase
-        .from("interactions")
-        .select("type, occurred_at, summary, raw_notes")
-        .eq("contact_id", contactId)
-        .order("occurred_at", { ascending: false })
-        .limit(8),
-    ]);
+  const [
+    { data: profile },
+    { data: contact },
+    { data: interactions },
+    { data: applications },
+    { data: prepItems },
+  ] = await Promise.all([
+    supabase.from("user_profiles").select("*").maybeSingle(),
+    supabase.from("contacts").select("*").eq("id", contactId).single(),
+    supabase
+      .from("interactions")
+      .select("type, occurred_at, summary, raw_notes")
+      .eq("contact_id", contactId)
+      .order("occurred_at", { ascending: false })
+      .limit(8),
+    supabase
+      .from("applications")
+      .select("company, role, status, deadline, next_step, notes")
+      .eq("contact_id", contactId)
+      .order("updated_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("prep_items")
+      .select("type, title, body, due_at")
+      .eq("contact_id", contactId)
+      .order("updated_at", { ascending: false })
+      .limit(8),
+  ]);
 
   if (!contact) {
     throw new Error("Contact not found.");
@@ -362,6 +799,8 @@ export async function generateDraft(formData: FormData) {
     userProfile: profile,
     contact,
     recentInteractions: interactions ?? [],
+    linkedApplications: applications ?? [],
+    relatedPrep: prepItems ?? [],
     instructions,
     outputContract: {
       subject: "optional email subject",
@@ -383,7 +822,7 @@ export async function generateDraft(formData: FormData) {
     model: getOpenAIModel(),
     max_output_tokens: 1400,
     instructions:
-      "You write warm, specific MBA recruiting outreach. Avoid generic praise, exaggeration, and sales language. Return a concise editable draft and practical next-step suggestions.",
+      "You write warm, specific MBA recruiting outreach inside a broader job-search workspace. Use contact, application, prep, and user profile context when relevant. Avoid generic praise, exaggeration, and sales language. Return a concise editable draft and practical next-step suggestions.",
     input: [
       {
         role: "user",

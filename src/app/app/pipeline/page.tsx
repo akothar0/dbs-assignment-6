@@ -15,8 +15,8 @@ export default async function PipelinePage() {
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Pipeline</h1>
         <p className="mt-2 text-[#6d665c]">
-          Relationship stages will show live contact counts once persistence is
-          connected.
+          Scan relationship stages across the contacts supporting your broader
+          recruiting search.
         </p>
       </div>
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">

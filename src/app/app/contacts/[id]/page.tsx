@@ -10,9 +10,11 @@ import {
   updateContactStage,
 } from "@/app/app/actions";
 import {
+  formatApplicationStatus,
   draftGoals,
   formatDate,
   formatDraftGoal,
+  formatPrepItemType,
   formatInteractionType,
   formatStage,
   interactionTypes,
@@ -56,6 +58,17 @@ export default async function ContactDetailPage({
     .eq("contact_id", id)
     .eq("status", "pending")
     .order("created_at", { ascending: false });
+  const { data: applicationsData } = await supabase
+    .from("applications")
+    .select("*")
+    .eq("contact_id", id)
+    .order("updated_at", { ascending: false });
+  const { data: prepData } = await supabase
+    .from("prep_items")
+    .select("*")
+    .eq("contact_id", id)
+    .order("updated_at", { ascending: false })
+    .limit(6);
 
   if (!contact) {
     notFound();
@@ -65,6 +78,8 @@ export default async function ContactDetailPage({
   const tasks = tasksData ?? [];
   const drafts = draftsData ?? [];
   const suggestions = suggestionsData ?? [];
+  const applications = applicationsData ?? [];
+  const prepItems = prepData ?? [];
   const openTasks = tasks.filter((task) => task.status === "open");
 
   return (
@@ -137,6 +152,50 @@ export default async function ContactDetailPage({
             </p>
           ) : null}
         </div>
+
+        {applications.length > 0 || prepItems.length > 0 ? (
+          <div className="rounded-lg border border-[#d7d0c3] bg-[#fffbf4] p-5">
+            <h2 className="font-semibold">Recruiting context</h2>
+            {applications.length > 0 ? (
+              <div className="mt-4 space-y-3">
+                <h3 className="text-sm font-semibold">Linked applications</h3>
+                {applications.map((application) => (
+                  <div
+                    key={application.id}
+                    className="rounded-md border border-[#e3dacc] bg-white p-3"
+                  >
+                    <p className="text-sm font-semibold">
+                      {application.role} · {application.company}
+                    </p>
+                    <p className="mt-1 text-sm text-[#6d665c]">
+                      {formatApplicationStatus(application.status)} · Deadline{" "}
+                      {formatDate(application.deadline)}
+                    </p>
+                    {application.next_step ? (
+                      <p className="mt-2 text-sm text-[#4b463d]">
+                        {application.next_step}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {prepItems.length > 0 ? (
+              <div className="mt-5 space-y-3">
+                <h3 className="text-sm font-semibold">Recent prep</h3>
+                {prepItems.map((item) => (
+                  <div key={item.id} className="text-sm">
+                    <p className="font-medium">{item.title}</p>
+                    <p className="text-[#6d665c]">
+                      {formatPrepItemType(item.type)} · Due{" "}
+                      {formatDate(item.due_at)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="rounded-lg border border-[#d7d0c3] bg-[#fffbf4] p-5">
           <h2 className="font-semibold">AI outreach draft</h2>

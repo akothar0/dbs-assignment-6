@@ -6,7 +6,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Rolo Project Notes
 
-- Rolo is a Next.js App Router app using Clerk auth, Supabase Postgres/RLS, and OpenAI for outreach drafts.
+- Rolo is a Next.js App Router app using Clerk auth, Supabase Postgres/RLS, and OpenAI for outreach drafts, prep briefs, and context extraction.
+- Product positioning is a manual-first MBA recruiting operating system: relationships, applications, prep, deadlines, and daily execution.
 - Use `src/proxy.ts` with `clerkMiddleware()` for protected routes; do not add Pages Router files.
 - Supabase auth is handled through Clerk third-party auth and Clerk session tokens. Do not add Supabase Auth cookie middleware.
 - User-owned Supabase rows must be scoped by Clerk `user_id` and RLS policies comparing `user_id` to `auth.jwt() ->> 'sub'`.

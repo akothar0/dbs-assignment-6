@@ -6,24 +6,26 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 
-const previewContacts = [
+const workspacePreview = [
   {
-    name: "Maya Shah",
-    company: "Google",
-    stage: "Coffee Chat",
-    next: "Send thank-you note",
+    area: "Today",
+    title: "Prep for Stripe PM coffee chat",
+    detail: "Use notes from Daniel and your fintech resume bullets.",
   },
   {
-    name: "Daniel Lee",
-    company: "Stripe",
-    stage: "Reached Out",
-    next: "Follow up after 7 days",
+    area: "Relationships",
+    title: "Priya Nair · Bain",
+    detail: "Replied yesterday. Referral ask draft is ready to review.",
   },
   {
-    name: "Priya Nair",
-    company: "Bain",
-    stage: "Replied",
-    next: "Draft referral ask",
+    area: "Applications",
+    title: "Google APM MBA internship",
+    detail: "Target role with campus deadline on Oct 14.",
+  },
+  {
+    area: "Prep",
+    title: "Consulting behavioral stories",
+    detail: "Tighten leadership, conflict, and ambiguity examples.",
   },
 ];
 
@@ -60,14 +62,14 @@ export default function Home() {
         <div className="grid flex-1 items-center gap-12 py-14 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="max-w-2xl">
             <p className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#1f6f68]">
-              Booth recruiting CRM
+              MBA recruiting operating system
             </p>
             <h1 className="text-5xl font-semibold leading-[1.02] tracking-tight text-[#171512] md:text-7xl">
-              Keep warm networking from going cold.
+              Run your recruiting search from one focused workspace.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-8 text-[#5f594f]">
-              Rolo turns contacts, notes, follow-ups, and AI-assisted outreach
-              into one focused daily workflow for MBA recruiting.
+              Rolo brings relationships, applications, prep, deadlines, and
+              AI-assisted outreach into one daily workflow for MBA recruiting.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Show when="signed-out">
@@ -82,14 +84,14 @@ export default function Home() {
                   href="/app/today"
                   className="rounded-md bg-[#1f6f68] px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-[#195b55]"
                 >
-                  Open today&apos;s queue
+                Open workspace
                 </Link>
               </Show>
               <Link
-                href="/app/contacts"
+                href="/app/applications"
                 className="rounded-md border border-[#c9c0b2] px-5 py-3 text-center text-sm font-semibold text-[#29251f] transition hover:border-[#8f8574]"
               >
-                View contacts
+                View applications
               </Link>
             </div>
           </div>
@@ -98,40 +100,42 @@ export default function Home() {
             <div className="flex items-center justify-between border-b border-[#e3dacc] pb-4">
               <div>
                 <p className="text-sm font-semibold text-[#171512]">
-                  Today&apos;s queue
+                  Workspace snapshot
                 </p>
-                <p className="text-sm text-[#6d665c]">3 priority actions</p>
+                <p className="text-sm text-[#6d665c]">
+                  Relationships, roles, prep, and actions
+                </p>
               </div>
               <span className="rounded-md bg-[#e5f0ee] px-3 py-1 text-xs font-semibold text-[#1f6f68]">
                 Live preview
               </span>
             </div>
             <div className="divide-y divide-[#e3dacc]">
-              {previewContacts.map((contact) => (
+              {workspacePreview.map((item) => (
                 <div
-                  key={contact.name}
-                  className="grid gap-3 py-4 sm:grid-cols-[1fr_auto]"
+                  key={item.title}
+                  className="grid gap-3 py-4 sm:grid-cols-[0.42fr_1fr]"
                 >
                   <div>
-                    <p className="font-semibold text-[#171512]">
-                      {contact.name}
-                    </p>
-                    <p className="text-sm text-[#6d665c]">
-                      {contact.company} · {contact.stage}
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#1f6f68]">
+                      {item.area}
                     </p>
                   </div>
-                  <p className="self-center text-sm font-medium text-[#1f6f68]">
-                    {contact.next}
-                  </p>
+                  <div>
+                    <p className="font-semibold text-[#171512]">{item.title}</p>
+                    <p className="text-sm text-[#6d665c]">
+                      {item.detail}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>
             <div className="mt-4 rounded-md bg-[#171512] p-4 text-white">
-              <p className="text-sm font-semibold">AI draft ready</p>
+              <p className="text-sm font-semibold">AI prep brief ready</p>
               <p className="mt-2 text-sm leading-6 text-[#d8d2c8]">
-                “Thanks again for walking me through the PM recruiting path at
-                Google. Your point about building a clear product narrative
-                was especially helpful...”
+                “Lead with your operator-to-product transition, ask about team
+                rituals, and close by confirming referral timing after the
+                application deadline.”
               </p>
             </div>
           </div>

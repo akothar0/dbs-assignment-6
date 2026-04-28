@@ -5,7 +5,9 @@ import { auth } from "@clerk/nextjs/server";
 const navItems = [
   { href: "/app/today", label: "Today" },
   { href: "/app/contacts", label: "Contacts" },
+  { href: "/app/applications", label: "Applications" },
   { href: "/app/pipeline", label: "Pipeline" },
+  { href: "/app/prep", label: "Prep" },
   { href: "/app/onboarding", label: "Profile" },
 ];
 

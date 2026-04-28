@@ -23,6 +23,7 @@ Open the Supabase SQL editor for the linked project and run:
 
 ```sql
 -- contents of supabase/migrations/0001_initial_schema.sql
+-- then contents of supabase/migrations/0002_applications_and_prep.sql
 ```
 
 The migration enables RLS on every user-owned table. Policies compare

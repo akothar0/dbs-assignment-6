@@ -16,6 +16,20 @@ async function TodayContent() {
   const { count: contactCount } = await supabase
     .from("contacts")
     .select("*", { count: "exact", head: true });
+  const { count: activeApplicationCount } = await supabase
+    .from("applications")
+    .select("*", { count: "exact", head: true })
+    .in("status", ["target", "applied", "interviewing"]);
+  const { count: openPrepCount } = await supabase
+    .from("prep_items")
+    .select("*", { count: "exact", head: true })
+    .is("completed_at", null);
+  const { data: upcomingApplications } = await supabase
+    .from("applications")
+    .select("company, role, deadline, next_step")
+    .not("deadline", "is", null)
+    .order("deadline", { ascending: true })
+    .limit(4);
   const { data: tasksData } = await supabase
     .from("tasks")
     .select("*, contacts(id, name, company)")
@@ -30,7 +44,8 @@ async function TodayContent() {
           Today&apos;s queue
         </h1>
         <p className="mt-2 text-[#6d665c]">
-          A focused command center for follow-ups, thank-yous, and reconnects.
+          A focused command center for relationships, applications, prep, and
+          next actions.
         </p>
       </div>
 
@@ -49,10 +64,20 @@ async function TodayContent() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <div className="rounded-lg border border-[#d7d0c3] bg-[#fffbf4] p-5">
           <p className="text-sm text-[#6d665c]">Contacts tracked</p>
           <p className="mt-3 text-3xl font-semibold">{contactCount ?? 0}</p>
+        </div>
+        <div className="rounded-lg border border-[#d7d0c3] bg-[#fffbf4] p-5">
+          <p className="text-sm text-[#6d665c]">Active applications</p>
+          <p className="mt-3 text-3xl font-semibold">
+            {activeApplicationCount ?? 0}
+          </p>
+        </div>
+        <div className="rounded-lg border border-[#d7d0c3] bg-[#fffbf4] p-5">
+          <p className="text-sm text-[#6d665c]">Open prep items</p>
+          <p className="mt-3 text-3xl font-semibold">{openPrepCount ?? 0}</p>
         </div>
         <div className="rounded-lg border border-[#d7d0c3] bg-[#fffbf4] p-5">
           <p className="text-sm text-[#6d665c]">Target roles</p>
@@ -60,15 +85,40 @@ async function TodayContent() {
             {profile?.target_roles.length ? profile.target_roles.length : 0}
           </p>
         </div>
-        <div className="rounded-lg border border-[#d7d0c3] bg-[#fffbf4] p-5">
-          <p className="text-sm text-[#6d665c]">Target companies</p>
-          <p className="mt-3 text-xl font-semibold">
-            {profile?.target_companies.length
-              ? profile.target_companies.length
-              : 0}
-          </p>
-        </div>
       </div>
+
+      {upcomingApplications?.length ? (
+        <div className="rounded-lg border border-[#d7d0c3] bg-[#fffbf4]">
+          <div className="border-b border-[#e3dacc] px-5 py-4">
+            <h2 className="font-semibold">Upcoming application deadlines</h2>
+            <p className="text-sm text-[#6d665c]">
+              Near-term role deadlines and next steps.
+            </p>
+          </div>
+          <div className="divide-y divide-[#e3dacc]">
+            {upcomingApplications.map((application) => (
+              <div
+                key={`${application.company}-${application.role}-${application.deadline}`}
+                className="grid gap-2 px-5 py-4 md:grid-cols-[1fr_auto]"
+              >
+                <div>
+                  <p className="font-semibold">
+                    {application.role} · {application.company}
+                  </p>
+                  {application.next_step ? (
+                    <p className="mt-1 text-sm text-[#6d665c]">
+                      {application.next_step}
+                    </p>
+                  ) : null}
+                </div>
+                <p className="self-center text-sm font-medium text-[#1f6f68]">
+                  {formatDate(application.deadline)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="rounded-lg border border-[#d7d0c3] bg-[#fffbf4]">
         <div className="border-b border-[#e3dacc] px-5 py-4">

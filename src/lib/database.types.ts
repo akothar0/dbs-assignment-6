@@ -27,6 +27,24 @@ export type DraftGoal =
 
 export type AiSuggestionStatus = "pending" | "accepted" | "dismissed";
 
+export type ApplicationStatus =
+  | "target"
+  | "applied"
+  | "interviewing"
+  | "offer"
+  | "rejected"
+  | "closed";
+
+export type PrepItemType =
+  | "company_research"
+  | "coffee_chat_prep"
+  | "interview_prep"
+  | "behavioral_story"
+  | "talking_point"
+  | "thank_you_follow_up"
+  | "prep_brief"
+  | "raw_capture";
+
 type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
 export type Database = {
@@ -257,6 +275,91 @@ export type Database = {
           },
         ];
       };
+      applications: {
+        Row: {
+          id: string;
+          user_id: string;
+          contact_id: string | null;
+          company: string;
+          role: string;
+          source: string | null;
+          status: ApplicationStatus;
+          deadline: string | null;
+          next_step: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          contact_id?: string | null;
+          company: string;
+          role: string;
+          source?: string | null;
+          status?: ApplicationStatus;
+          deadline?: string | null;
+          next_step?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["applications"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "applications_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      prep_items: {
+        Row: {
+          id: string;
+          user_id: string;
+          contact_id: string | null;
+          application_id: string | null;
+          type: PrepItemType;
+          title: string;
+          body: string | null;
+          due_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          contact_id?: string | null;
+          application_id?: string | null;
+          type: PrepItemType;
+          title: string;
+          body?: string | null;
+          due_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["prep_items"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "prep_items_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "prep_items_application_id_fkey";
+            columns: ["application_id"];
+            isOneToOne: false;
+            referencedRelation: "applications";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -267,6 +370,8 @@ export type Database = {
       task_source: TaskSource;
       draft_goal: DraftGoal;
       ai_suggestion_status: AiSuggestionStatus;
+      application_status: ApplicationStatus;
+      prep_item_type: PrepItemType;
     };
     CompositeTypes: Record<string, never>;
   };
