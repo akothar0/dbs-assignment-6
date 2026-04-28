@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createAnthropicClient, getAnthropicModel } from "@/lib/anthropic";
+import {
+  createOpenAIClient,
+  draftResponseFormat,
+  getOpenAIModel,
+} from "@/lib/openai";
 import type {
   DraftGoal,
   InteractionType,
@@ -59,27 +63,6 @@ function parseDraftGoal(value: FormDataEntryValue | null): DraftGoal {
   }
 
   return "follow_up";
-}
-
-function parseJsonObject(value: string) {
-  const match = value.match(/\{[\s\S]*\}/);
-  if (!match) {
-    throw new Error("Claude did not return JSON.");
-  }
-
-  return JSON.parse(match[0]) as {
-    subject?: string | null;
-    body?: string;
-    confidence?: number;
-    personalizationSignals?: string[];
-    suggestedTask?: {
-      title?: string;
-      description?: string | null;
-      due_at?: string | null;
-    } | null;
-    suggestedStage?: PipelineStage | null;
-    reasoning?: string | null;
-  };
 }
 
 export async function saveProfile(formData: FormData) {
@@ -349,7 +332,7 @@ export async function dismissTask(formData: FormData) {
 export async function generateDraft(formData: FormData) {
   const userId = await getCurrentUserId();
   const supabase = await createSupabaseServerClient();
-  const anthropic = createAnthropicClient();
+  const openai = createOpenAIClient();
   const contactId = optionalString(formData.get("contact_id"));
   const goal = parseDraftGoal(formData.get("goal"));
   const instructions = optionalString(formData.get("instructions"));
@@ -396,27 +379,25 @@ export async function generateDraft(formData: FormData) {
     validStages: pipelineStages.map((stage) => stage.value),
   };
 
-  const message = await anthropic.messages.create({
-    model: getAnthropicModel(),
-    max_tokens: 1400,
-    system:
-      "You write warm, specific MBA recruiting outreach. Avoid generic praise, exaggeration, and sales language. Return only valid JSON matching the requested contract.",
-    messages: [
+  const response = await openai.responses.parse({
+    model: getOpenAIModel(),
+    max_output_tokens: 1400,
+    instructions:
+      "You write warm, specific MBA recruiting outreach. Avoid generic praise, exaggeration, and sales language. Return a concise editable draft and practical next-step suggestions.",
+    input: [
       {
         role: "user",
         content: JSON.stringify(prompt, null, 2),
       },
     ],
+    text: {
+      format: draftResponseFormat(),
+    },
   });
+  const parsed = response.output_parsed;
 
-  const text = message.content
-    .filter((part) => part.type === "text")
-    .map((part) => part.text)
-    .join("\n");
-  const parsed = parseJsonObject(text);
-
-  if (!parsed.body) {
-    throw new Error("Claude returned an empty draft.");
+  if (!parsed?.body) {
+    throw new Error("OpenAI returned an empty draft.");
   }
 
   const suggestedStage = pipelineStages.some(

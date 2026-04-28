@@ -16,7 +16,7 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 Copy `.env.example` to `.env.local` and fill in the Clerk, Supabase, and
-Anthropic values as each integration is enabled.
+OpenAI values as each integration is enabled.
 
 ## Scripts
 
@@ -33,7 +33,7 @@ npm run build
 - Pipeline view
 - Clerk authentication
 - Supabase persistence and RLS
-- Claude-powered editable outreach drafts
+- OpenAI-powered editable outreach drafts
 
 No Gmail sync, LinkedIn CSV import, enrichment API, Granola integration, or
 auto-send is included in v1.
@@ -45,8 +45,7 @@ auto-send is included in v1.
 - Supabase setup: add `NEXT_PUBLIC_SUPABASE_URL` and
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, then run
   `supabase/migrations/0001_initial_schema.sql` in the Supabase SQL editor.
-- Anthropic setup: add `ANTHROPIC_API_KEY`; the default model is
-  `claude-sonnet-4-6`.
+- OpenAI setup: add `OPENAI_API_KEY`; the default model is `gpt-4.1-mini`.
 - Deployment checklist: see `docs/deployment.md`.
 
 ## Deploy on Vercel

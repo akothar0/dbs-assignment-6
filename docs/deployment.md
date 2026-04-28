@@ -2,7 +2,7 @@
 
 Rolo deploys as a standard Next.js app on Vercel. Authentication is handled by
 Clerk, database access by Supabase with Clerk third-party auth, and draft
-generation by Anthropic.
+generation by OpenAI.
 
 ## Before Deploying
 
@@ -27,8 +27,8 @@ CLERK_SECRET_KEY=
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
-ANTHROPIC_API_KEY=
-ANTHROPIC_MODEL=claude-sonnet-4-6
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1-mini
 ```
 
 Do not add `SUPABASE_SERVICE_ROLE_KEY` unless you later create server-only
