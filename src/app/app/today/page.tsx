@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { completeTask, dismissTask } from "@/app/app/actions";
+import { formatDate } from "@/lib/crm";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default function TodayPage() {
@@ -14,6 +16,12 @@ async function TodayContent() {
   const { count: contactCount } = await supabase
     .from("contacts")
     .select("*", { count: "exact", head: true });
+  const { data: tasksData } = await supabase
+    .from("tasks")
+    .select("*, contacts(id, name, company)")
+    .eq("status", "open")
+    .order("due_at", { ascending: true, nullsFirst: false });
+  const tasks = tasksData ?? [];
 
   return (
     <div className="space-y-6">
@@ -62,11 +70,71 @@ async function TodayContent() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-dashed border-[#c9c0b2] bg-[#fffbf4] p-8">
-        <p className="font-medium">No rule-based actions yet</p>
-        <p className="mt-2 text-sm leading-6 text-[#6d665c]">
-          Log interactions in the next slice to generate follow-up tasks.
-        </p>
+      <div className="rounded-lg border border-[#d7d0c3] bg-[#fffbf4]">
+        <div className="border-b border-[#e3dacc] px-5 py-4">
+          <h2 className="font-semibold">Open actions</h2>
+          <p className="text-sm text-[#6d665c]">
+            Rule-generated and manual tasks sorted by due date.
+          </p>
+        </div>
+        {tasks.length === 0 ? (
+          <div className="p-8">
+            <p className="font-medium">No actions yet</p>
+            <p className="mt-2 text-sm leading-6 text-[#6d665c]">
+              Log a coffee chat, email, LinkedIn message, or call to generate
+              follow-up tasks.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-[#e3dacc]">
+            {tasks.map((task) => (
+              <div
+                key={task.id}
+                className="grid gap-4 px-5 py-4 md:grid-cols-[1fr_auto]"
+              >
+                <div>
+                  <p className="font-semibold">{task.title}</p>
+                  <p className="mt-1 text-sm text-[#6d665c]">
+                    Due {formatDate(task.due_at)} · {task.source}
+                  </p>
+                  {task.contacts ? (
+                    <Link
+                      href={`/app/contacts/${task.contacts.id}`}
+                      className="mt-2 inline-flex text-sm font-medium text-[#1f6f68]"
+                    >
+                      {task.contacts.name}
+                      {task.contacts.company ? ` · ${task.contacts.company}` : ""}
+                    </Link>
+                  ) : null}
+                </div>
+                <div className="flex gap-2 self-center">
+                  <form action={completeTask}>
+                    <input type="hidden" name="task_id" value={task.id} />
+                    <input
+                      type="hidden"
+                      name="contact_id"
+                      value={task.contact_id ?? ""}
+                    />
+                    <button className="rounded-md border border-[#c9c0b2] px-3 py-2 text-sm font-semibold">
+                      Complete
+                    </button>
+                  </form>
+                  <form action={dismissTask}>
+                    <input type="hidden" name="task_id" value={task.id} />
+                    <input
+                      type="hidden"
+                      name="contact_id"
+                      value={task.contact_id ?? ""}
+                    />
+                    <button className="rounded-md border border-[#c9c0b2] px-3 py-2 text-sm font-semibold">
+                      Dismiss
+                    </button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

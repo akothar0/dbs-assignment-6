@@ -1,4 +1,4 @@
-import type { PipelineStage } from "@/lib/database.types";
+import type { InteractionType, PipelineStage } from "@/lib/database.types";
 
 export const pipelineStages: Array<{ value: PipelineStage; label: string }> = [
   { value: "cold", label: "Cold" },
@@ -23,4 +23,25 @@ export function formatDate(value: string | null) {
     day: "numeric",
     year: "numeric",
   }).format(new Date(value));
+}
+
+export const interactionTypes: Array<{ value: InteractionType; label: string }> =
+  [
+    { value: "email", label: "Email" },
+    { value: "linkedin", label: "LinkedIn" },
+    { value: "coffee_chat", label: "Coffee Chat" },
+    { value: "call", label: "Call" },
+    { value: "note", label: "Note" },
+    { value: "application", label: "Application" },
+    { value: "referral", label: "Referral" },
+  ];
+
+export function formatInteractionType(type: InteractionType) {
+  return interactionTypes.find((item) => item.value === type)?.label ?? type;
+}
+
+export function addDays(value: string | Date, days: number) {
+  const date = new Date(value);
+  date.setDate(date.getDate() + days);
+  return date.toISOString();
 }
