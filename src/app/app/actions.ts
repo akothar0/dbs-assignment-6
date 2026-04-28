@@ -698,6 +698,40 @@ export async function createTask(formData: FormData) {
   }
 }
 
+export async function updateTask(formData: FormData) {
+  const supabase = await createSupabaseServerClient();
+  const taskId = optionalString(formData.get("task_id"));
+  const contactId = optionalString(formData.get("contact_id"));
+  const title = optionalString(formData.get("title"));
+  const dueAt = optionalString(formData.get("due_at"));
+
+  if (!taskId) {
+    throw new Error("Task id is required.");
+  }
+
+  if (!title) {
+    throw new Error("Task title is required.");
+  }
+
+  const { error } = await supabase
+    .from("tasks")
+    .update({
+      title,
+      description: optionalString(formData.get("description")),
+      due_at: dueAt ? new Date(dueAt).toISOString() : null,
+    })
+    .eq("id", taskId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/app/today");
+  if (contactId) {
+    revalidatePath(`/app/contacts/${contactId}`);
+  }
+}
+
 export async function completeTask(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const taskId = optionalString(formData.get("task_id"));

@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { completeTask, dismissTask } from "@/app/app/actions";
+import { SubmitButton } from "@/app/app/form-controls";
+import { TaskSourceChip } from "@/app/app/task-ui";
 import { formatDate } from "@/lib/crm";
+import type { TaskSource } from "@/lib/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default function TodayPage() {
@@ -36,6 +39,7 @@ async function TodayContent() {
     .eq("status", "open")
     .order("due_at", { ascending: true, nullsFirst: false });
   const tasks = tasksData ?? [];
+  const taskGroups = groupTasks(tasks);
 
   return (
     <div className="space-y-6">
@@ -124,68 +128,152 @@ async function TodayContent() {
         <div className="border-b border-[#e3dacc] px-5 py-4">
           <h2 className="font-semibold">Open actions</h2>
           <p className="text-sm text-[#6d665c]">
-            Rule-generated and manual tasks sorted by due date.
+            Open tasks grouped by due date.
           </p>
         </div>
         {tasks.length === 0 ? (
           <div className="p-8">
             <p className="font-medium">No actions yet</p>
             <p className="mt-2 text-sm leading-6 text-[#6d665c]">
-              Log a coffee chat, email, LinkedIn message, or call to generate
-              follow-up tasks.
+              Add a contact task or log an interaction to create follow-up work.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-[#e3dacc]">
-            {tasks.map((task) => (
-              <div
-                key={task.id}
-                className="grid gap-4 px-5 py-4 md:grid-cols-[1fr_auto]"
-              >
-                <div>
-                  <p className="font-semibold">{task.title}</p>
-                  <p className="mt-1 text-sm text-[#6d665c]">
-                    Due {formatDate(task.due_at)} · {task.source}
-                  </p>
-                  {task.contacts ? (
-                    <Link
-                      href={`/app/contacts/${task.contacts.id}`}
-                      className="mt-2 inline-flex text-sm font-medium text-[#1f6f68]"
-                    >
-                      {task.contacts.name}
-                      {task.contacts.company ? ` · ${task.contacts.company}` : ""}
-                    </Link>
-                  ) : null}
-                </div>
-                <div className="flex gap-2 self-center">
-                  <form action={completeTask}>
-                    <input type="hidden" name="task_id" value={task.id} />
-                    <input
-                      type="hidden"
-                      name="contact_id"
-                      value={task.contact_id ?? ""}
-                    />
-                    <button className="rounded-md border border-[#c9c0b2] px-3 py-2 text-sm font-semibold">
-                      Complete
-                    </button>
-                  </form>
-                  <form action={dismissTask}>
-                    <input type="hidden" name="task_id" value={task.id} />
-                    <input
-                      type="hidden"
-                      name="contact_id"
-                      value={task.contact_id ?? ""}
-                    />
-                    <button className="rounded-md border border-[#c9c0b2] px-3 py-2 text-sm font-semibold">
-                      Dismiss
-                    </button>
-                  </form>
-                </div>
-              </div>
-            ))}
+          <div>
+            {taskGroups.map((group) =>
+              group.tasks.length > 0 ? (
+                <section
+                  className="border-b border-[#e3dacc] last:border-b-0"
+                  key={group.label}
+                >
+                  <div className="bg-[#f7f4ee] px-5 py-3">
+                    <h3 className="text-sm font-semibold">
+                      {group.label} ({group.tasks.length})
+                    </h3>
+                  </div>
+                  <div className="divide-y divide-[#e3dacc]">
+                    {group.tasks.map((task) => (
+                      <div
+                        key={task.id}
+                        className="grid gap-4 px-5 py-4 md:grid-cols-[1fr_auto]"
+                      >
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold">{task.title}</p>
+                            <TaskSourceChip source={task.source} />
+                          </div>
+                          <p className="mt-1 text-sm text-[#6d665c]">
+                            Due {formatDate(task.due_at)}
+                          </p>
+                          {task.description ? (
+                            <p className="mt-2 text-sm leading-6 text-[#4b463d]">
+                              {task.description}
+                            </p>
+                          ) : null}
+                          {task.contacts ? (
+                            <Link
+                              href={`/app/contacts/${task.contacts.id}`}
+                              className="mt-2 inline-flex text-sm font-medium text-[#1f6f68]"
+                            >
+                              {task.contacts.name}
+                              {task.contacts.company
+                                ? ` · ${task.contacts.company}`
+                                : ""}
+                            </Link>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-wrap gap-2 self-start md:self-center">
+                          <form action={completeTask}>
+                            <input
+                              type="hidden"
+                              name="task_id"
+                              value={task.id}
+                            />
+                            <input
+                              type="hidden"
+                              name="contact_id"
+                              value={task.contact_id ?? ""}
+                            />
+                            <SubmitButton
+                              label="Complete"
+                              pendingLabel="Completing..."
+                              variant="secondary"
+                            />
+                          </form>
+                          <form action={dismissTask}>
+                            <input
+                              type="hidden"
+                              name="task_id"
+                              value={task.id}
+                            />
+                            <input
+                              type="hidden"
+                              name="contact_id"
+                              value={task.contact_id ?? ""}
+                            />
+                            <SubmitButton
+                              label="Dismiss"
+                              pendingLabel="Dismissing..."
+                              variant="secondary"
+                            />
+                          </form>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null,
+            )}
           </div>
         )}
       </div>
     </div>
   );
+}
+
+type TaskWithContact = {
+  id: string;
+  contact_id: string | null;
+  title: string;
+  description: string | null;
+  due_at: string | null;
+  source: TaskSource;
+  contacts: { id: string; name: string; company: string | null } | null;
+};
+
+function groupTasks(tasks: TaskWithContact[]) {
+  const now = new Date();
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+  return [
+    {
+      label: "Overdue",
+      tasks: tasks.filter(
+        (task) => task.due_at && new Date(task.due_at) < todayStart,
+      ),
+    },
+    {
+      label: "Today",
+      tasks: tasks.filter((task) => {
+        if (!task.due_at) {
+          return false;
+        }
+        const dueAt = new Date(task.due_at);
+        return dueAt >= todayStart && dueAt < tomorrowStart;
+      }),
+    },
+    {
+      label: "Upcoming",
+      tasks: tasks.filter(
+        (task) => task.due_at && new Date(task.due_at) >= tomorrowStart,
+      ),
+    },
+    {
+      label: "No due date",
+      tasks: tasks.filter((task) => !task.due_at),
+    },
+  ];
 }
