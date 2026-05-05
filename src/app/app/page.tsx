@@ -233,10 +233,6 @@ export default async function NetworkHomePage() {
           <h1 className="mt-4 max-w-2xl text-4xl font-semibold tracking-tight md:text-6xl">
             What needs attention right now.
           </h1>
-          <p className="mt-5 max-w-xl text-base leading-7 text-[#5f594f]">
-            Calm relationship signals, one persistent thread per contact, and a
-            single place to keep recruiting moving.
-          </p>
         </div>
 
         {!onboardingComplete ? (
@@ -328,9 +324,6 @@ export default async function NetworkHomePage() {
         <div className="flex items-end justify-between gap-4">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight">Today</h2>
-            <p className="mt-1 text-sm text-[#6d665c]">
-              Signals derived from thread state, meetings, and recent touchpoints.
-            </p>
           </div>
           <p className="text-sm text-[#6d665c]">{sortedFeed.length} signal{sortedFeed.length === 1 ? "" : "s"}</p>
         </div>
@@ -363,9 +356,6 @@ export default async function NetworkHomePage() {
       <section className="space-y-4">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Companies</h2>
-          <p className="mt-1 text-sm text-[#6d665c]">
-            Lightweight company list with contact count and momentum.
-          </p>
         </div>
         <div className="grid gap-3">
           {companies.length === 0 ? (

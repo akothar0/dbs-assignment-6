@@ -633,15 +633,12 @@ function OutreachChat({
   return (
     <aside className="rounded-3xl border border-[#d7d0c3] bg-[#fffbf4] p-5">
       <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#1f6f68]">Outreach chat</p>
-      <h2 className="mt-2 text-lg font-semibold">Persistent strategy chat</h2>
-      <p className="mt-2 text-sm text-[#6d665c]">
-        Keep strategic context with this relationship instead of restarting the conversation.
-      </p>
+      <h2 className="mt-2 text-lg font-semibold">Ask Rolo</h2>
 
       <div className="mt-5 space-y-3">
         {messagesState.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-[#c9c0b2] px-4 py-6 text-sm text-[#6d665c]">
-            Ask a question here and the chat will stay attached to {contact.name}.
+            Ask anything about {contact.name}'s relationship thread.
           </p>
         ) : (
           messagesState.map((message) => (
