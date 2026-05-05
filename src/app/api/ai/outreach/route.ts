@@ -105,7 +105,7 @@ export async function POST(request: Request) {
     });
 
     if (userTurnError) {
-      return jsonError(userTurnError.message, 500);
+      console.error("Failed to persist outreach chat user turn:", userTurnError);
     }
 
     chatMessages.push({
@@ -212,7 +212,7 @@ export async function POST(request: Request) {
           });
 
           if (error) {
-            throw new Error(error.message);
+            console.error("Failed to persist outreach chat assistant turn:", error);
           }
 
           revalidatePath(`/app/contacts/${contactId}`);
