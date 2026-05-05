@@ -4,25 +4,21 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { href: "/app/today", label: "Today" },
-  { href: "/app/contacts", label: "Contacts" },
-  { href: "/app/applications", label: "Applications" },
-  { href: "/app/pipeline", label: "Pipeline" },
+  { href: "/app", label: "Network" },
   { href: "/app/prep", label: "Prep" },
-  { href: "/app/onboarding", label: "Profile" },
+  { href: "/app/profile", label: "Profile" },
 ];
 
-export function AppNav({ compact = false }: { compact?: boolean }) {
+export function AppNav() {
   const pathname = usePathname();
-  const navClass = compact
-    ? "flex gap-1 overflow-x-auto px-5 pb-3 md:hidden"
-    : "hidden items-center gap-1 md:flex";
 
   return (
-    <nav className={navClass}>
+    <nav className="flex items-center gap-1">
       {navItems.map((item) => {
         const active =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
+          item.href === "/app"
+            ? pathname === "/app"
+            : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
         return (
           <Link
@@ -34,7 +30,7 @@ export function AppNav({ compact = false }: { compact?: boolean }) {
             }`}
             href={item.href}
             key={item.href}
-          >
+            >
             {item.label}
           </Link>
         );
